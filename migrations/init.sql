@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  active_value INTEGER DEFAULT NULL,
+  updated_at TEXT
+);
+
+INSERT OR IGNORE INTO config (id, active_value, updated_at) VALUES (1, NULL, NULL);
+
+CREATE TABLE IF NOT EXISTS history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  value INTEGER NOT NULL,
+  actor TEXT NOT NULL,
+  timestamp TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL
+);
