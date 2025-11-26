@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build": "echo \"No build step needed for this project\""
   },
   "dependencies": {
     "better-sqlite3": "^8.0.1",
