@@ -1,11 +1,4 @@
 {
-  "name": "my-app",
-  "version": "1.0.0",
-  "scripts": {
-    "start": "node dist/main.js",
-    "build": "nest build"
-  },
-{
   "name": "number-generator",
   "version": "1.0.0",
   "description": "Simple number generator with admin panel",
