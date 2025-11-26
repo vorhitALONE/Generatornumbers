@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const helmet = require('helmet');
 const cors = require('cors');
 const fs = require('fs');
+
 const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
@@ -15,8 +16,6 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 const app = express();
-
-// Middleware
 app.use(helmet());
 app.use(cors());
 app.use(bodyParser.json());
@@ -29,10 +28,10 @@ app.use(session({
   cookie: { secure: false, httpOnly: true }
 }));
 
-// Статические файлы
+// Serve static files from public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ensure admin user exists
+// Ensure admin user exists (on startup)
 (async () => {
   try {
     const saltRounds = 10;
@@ -121,16 +120,18 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
   if (Number.isNaN(intValue)) return res.status(400).json({ error: 'Value must be integer' });
 
   const now = new Date().toISOString();
-  db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(intValue, now);
-  db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(intValue, 'admin', now);
+  const update = db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1');
+  update.run(intValue, now);
+
+  const insert = db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)');
+  insert.run(intValue, 'admin', now);
 
   res.json({ ok: true, value: intValue, updatedAt: now });
 });
 
-// Fallback for unknown routes
+// Fallback for unknown routes - let static serve files or 404
 app.use((req, res, next) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Start server
 app.listen(PORT, () => console.log(`Server started on http://localhost:${PORT}`));
