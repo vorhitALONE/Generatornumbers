@@ -14,7 +14,18 @@ const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const express = require('express');
+const path = require('path');
+const app = express();
 
+// Статические файлы из папки public
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(3000, () => console.log('Server started on port 3000'));
 const app = express();
 app.use(helmet());
 app.use(cors());
