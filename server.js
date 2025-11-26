@@ -7,26 +7,16 @@ const bcrypt = require('bcrypt');
 const helmet = require('helmet');
 const cors = require('cors');
 const fs = require('fs');
-
 const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const express = require('express');
-const path = require('path');
+
 const app = express();
 
-// Статические файлы из папки public
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(3000, () => console.log('Server started on port 3000'));
-const app = express();
+// Middleware
 app.use(helmet());
 app.use(cors());
 app.use(bodyParser.json());
@@ -39,10 +29,10 @@ app.use(session({
   cookie: { secure: false, httpOnly: true }
 }));
 
-// Serve static files from public folder
+// Статические файлы
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ensure admin user exists (on startup)
+// Ensure admin user exists
 (async () => {
   try {
     const saltRounds = 10;
@@ -131,18 +121,16 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
   if (Number.isNaN(intValue)) return res.status(400).json({ error: 'Value must be integer' });
 
   const now = new Date().toISOString();
-  const update = db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1');
-  update.run(intValue, now);
-
-  const insert = db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)');
-  insert.run(intValue, 'admin', now);
+  db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(intValue, now);
+  db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(intValue, 'admin', now);
 
   res.json({ ok: true, value: intValue, updatedAt: now });
 });
 
-// Fallback for unknown routes - let static serve files or 404
+// Fallback for unknown routes
 app.use((req, res, next) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// Start server
 app.listen(PORT, () => console.log(`Server started on http://localhost:${PORT}`));
