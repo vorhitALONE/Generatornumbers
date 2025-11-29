@@ -15,22 +15,29 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const express = require('express');
+const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 5000;
 
+// Другие middlewares
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Пример маршрута
-app.get('/api/data', (req, res) => {
-  res.json({ message: 'Бэкенд работает' });
+// Если есть API роуты
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Backend работает!' });
 });
 
-// Важно слушать на всех интерфейсах
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
+// Отдача фронтенда (React build)
+app.use(express.static(path.join(__dirname, 'frontend', 'build')));
+
+// Любой другой роут — отдаём index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
 });
 
-const app = express();
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 app.use(helmet());
 app.use(cors());
 app.use(bodyParser.json());
