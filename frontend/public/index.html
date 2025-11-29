@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screen 1</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Font Awesome -->
+  <script>
+    window.FontAwesomeConfig = {
+      autoReplaceSvg: 'nest',
+    };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap">
+
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    * {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+    }
+    .fa, .fas, .far, .fal, .fab {
+      font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen m-0 p-0 bg-white">
+  <div id="main-content" class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+  <header id="header-landing" class="bg-white shadow-sm border-b border-slate-200">
+    <div class="container mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
+            <i class="fa-solid fa-dice text-white text-xl"></i>
+          </div>
+          <h1 class="text-2xl font-bold text-slate-800">Генератор Числа</h1>
+        </div>
+        <a href="admin.html" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors duration-200 flex items-center space-x-2">
+          <i class="fa-solid fa-user-shield"></i>
+          <span>Админ-панель</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <section id="section-hero" class="py-16">
+    <div class="container mx-auto px-4 max-w-4xl">
+      <div class="text-center mb-12">
+        <h2 class="text-4xl font-bold text-slate-800 mb-4">Генератор Случайного Числа</h2>
+        <p class="text-lg text-slate-600">Нажмите кнопку для получения числа, установленного администратором</p>
+      </div>
+
+      <div id="card-generator" class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+        <div class="text-center mb-8">
+          <div class="inline-block bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 mb-4">
+            <div class="text-sm font-medium text-blue-600 mb-2">Текущее активное число</div>
+            <div id="active-number-display" class="text-6xl font-bold text-blue-600">---</div>
+            <div id="active-number-time" class="text-xs text-slate-500 mt-2">Загрузка...</div>
+          </div>
+        </div>
+
+        <div class="flex justify-center mb-8">
+          <button id="generate-btn" class="group relative px-12 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 active:scale-95">
+            <span class="flex items-center space-x-3">
+              <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+              <span>Сгенерировать</span>
+            </span>
+          </button>
+        </div>
+
+        <div id="result-container" class="hidden">
+          <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border-2 border-green-200">
+            <div class="text-center">
+              <div class="text-sm font-medium text-green-700 mb-2">Сгенерированное число</div>
+              <div id="generated-number" class="text-5xl font-bold text-green-600 mb-2">0</div>
+              <div id="generated-time" class="text-xs text-slate-600"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="error-container" class="hidden mt-4">
+          <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <div class="flex items-center">
+              <i class="fa-solid fa-circle-exclamation text-red-500 mr-3"></i>
+              <p id="error-message" class="text-sm text-red-700"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="card-history" class="bg-white rounded-2xl shadow-xl p-8">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-2xl font-bold text-slate-800 flex items-center space-x-2">
+            <i class="fa-solid fa-clock-rotate-left text-blue-500"></i>
+            <span>История генераций</span>
+          </h3>
+          <button id="refresh-history-btn" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200">
+            <i class="fa-solid fa-rotate-right mr-2"></i>Обновить
+          </button>
+        </div>
+
+        <div id="history-list" class="space-y-3">
+          <div class="text-center py-8 text-slate-500">
+            <i class="fa-solid fa-spinner fa-spin text-3xl mb-3"></i>
+            <p>Загрузка истории...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="footer-main" class="bg-white border-t border-slate-200 mt-16">
+    <div class="container mx-auto px-4 py-8">
+      <div class="text-center text-slate-600 text-sm">
+        <p class="mb-2">© 2025 Генератор Числа. Все права защищены.</p>
+        <p class="text-xs text-slate-500">Простое веб-приложение для генерации чисел с админ-панелью</p>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script src="/js/main.js"></script>
+</body>
+</html>
