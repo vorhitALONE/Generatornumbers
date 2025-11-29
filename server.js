@@ -14,6 +14,21 @@ const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(express.json());
+
+// Пример маршрута
+app.get('/api/data', (req, res) => {
+  res.json({ message: 'Бэкенд работает' });
+});
+
+// Важно слушать на всех интерфейсах
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Сервер запущен на порту ${PORT}`);
+});
 
 const app = express();
 app.use(helmet());
