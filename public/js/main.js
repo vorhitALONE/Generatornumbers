@@ -1,7 +1,10 @@
 // main.js — логика для index.html
 let activeNumber = null;
 let historyData = [];
-
+import cors from 'cors';
+app.use(cors({
+  origin: '*' // временно для теста, лучше указать фронтенд-домен
+}));
 async function fetchActiveNumber() {
   try {
     const response = await fetch('/api/active');
