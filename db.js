@@ -13,3 +13,12 @@ const initSql = fs.readFileSync(path.join(__dirname, 'migrations', 'init.sql'), 
 db.exec(initSql);
 
 module.exports = db;
+db.exec(`
+  CREATE TABLE IF NOT EXISTS config (
+    id INTEGER PRIMARY KEY,
+    active_value INTEGER,
+    updated_at TEXT
+  );
+  
+  INSERT OR IGNORE INTO config (id, active_value) VALUES (1, NULL);
+`);
