@@ -189,13 +189,33 @@ app.post('/api/admin/logout', (req, res) => {
 
 app.post('/api/admin/active', requireAdmin, (req, res) => {
   try {
-    console.log('📝 Setting active value:', req.body); // ДОБАВЛЕНО
+    console.log('📝 Setting active value:', req.body);
     
     const value = parseInt(req.body.value);
     if (isNaN(value)) {
-      console.log('❌ Invalid value:', req.body.value);
-      return res.status(400).json({ error: 'Invalid value' });
+      return res.status(400).json({ error: 'Некорректное число' });
     }
+
+    const now = new Date().toISOString();
+    
+    // Проверяем существование записи
+    const exists = db.prepare('SELECT id FROM config WHERE id = 1').get();
+    if (!exists) {
+      db.prepare('INSERT INTO config (id, active_value, updated_at) VALUES (1, ?, ?)').run(value, now);
+    } else {
+      db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(value, now);
+    }
+    
+    db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(value, 'admin', now);
+
+    console.log('✅ Active value set to:', value);
+    res.json({ ok: true, value, updatedAt: now });
+  } catch (error) {
+    console.error('Error setting active value:', error);
+    res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
+  }
+});
+
 
     const now = new Date().toISOString();
     db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(value, now);
