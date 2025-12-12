@@ -15,29 +15,45 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret_key_123
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// Middlewares
+// Middlewares - ИСПРАВЛЕННЫЙ CORS
+app.use(cors({
+  origin: function(origin, callback) {
+    // Разрешаем все домены для разработки
+    const allowedOrigins = [
+      'https://vorhitalone-generator--a39d.twc1.net',
+      'http://localhost:3000',
+      'http://localhost:3001'
+    ];
+    
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Временно разрешаем все
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie']
+}));
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
 
-app.use(cors({
-  origin: ['https://vorhitalone-generator--a39d.twc1.net', 'http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// ИСПРАВЛЕННАЯ СЕССИЯ - без secure cookie для отладки
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,  // ИЗМЕНЕНО: false для работы через http/https
     httpOnly: true,
+    sameSite: 'none',  // ДОБАВЛЕНО: для кросс-доменных запросов
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -63,8 +79,15 @@ function getActive() {
 }
 
 function requireAdmin(req, res, next) {
-  if (req.session && req.session.admin) return next();
-  res.status(401).json({ error: 'Unauthorized' });
+  console.log('🔐 Checking admin session:', req.session); // ДОБАВЛЕНО: логирование
+  
+  if (req.session && req.session.admin) {
+    console.log('✅ Admin authenticated:', req.session.admin.username);
+    return next();
+  }
+  
+  console.log('❌ Admin not authenticated');
+  res.status(401).json({ error: 'Unauthorized - Please login again' });
 }
 
 // API ROUTES
@@ -113,22 +136,38 @@ app.post('/api/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
+    console.log('🔑 Login attempt for:', username); // ДОБАВЛЕНО
+    
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
     const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
     if (!admin) {
+      console.log('❌ Admin not found');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const ok = await bcrypt.compare(password, admin.password_hash);
     if (!ok) {
+      console.log('❌ Password incorrect');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     req.session.admin = { id: admin.id, username: admin.username };
-    res.json({ ok: true, username: admin.username });
+    
+    // ДОБАВЛЕНО: Сохраняем сессию явно
+    req.session.save((err) => {
+      if (err) {
+        console.error('❌ Session save error:', err);
+        return res.status(500).json({ error: 'Login failed' });
+      }
+      
+      console.log('✅ Admin logged in:', admin.username);
+      console.log('Session ID:', req.sessionID);
+      res.json({ ok: true, username: admin.username });
+    });
+    
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -144,8 +183,11 @@ app.post('/api/admin/logout', (req, res) => {
 
 app.post('/api/admin/active', requireAdmin, (req, res) => {
   try {
+    console.log('📝 Setting active value:', req.body); // ДОБАВЛЕНО
+    
     const value = parseInt(req.body.value);
     if (isNaN(value)) {
+      console.log('❌ Invalid value:', req.body.value);
       return res.status(400).json({ error: 'Invalid value' });
     }
 
@@ -153,14 +195,17 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
     db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(value, now);
     db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(value, 'admin', now);
 
+    console.log('✅ Active value set to:', value);
     res.json({ ok: true, value, updatedAt: now });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error setting active value:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
 app.get('/api/admin/check', (req, res) => {
+  console.log('🔍 Checking session:', req.session); // ДОБАВЛЕНО
+  
   if (req.session && req.session.admin) {
     res.json({ authenticated: true, username: req.session.admin.username });
   } else {
@@ -180,8 +225,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server - ВАЖНО: 0.0.0.0 для Timeweb
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server started on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔐 Admin username: ${ADMIN_USERNAME}`);
 });
