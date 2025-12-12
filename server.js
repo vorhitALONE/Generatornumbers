@@ -14,6 +14,12 @@ const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret_key_123';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+cookie: { 
+  secure: true,  // ВАЖНО: true для production на HTTPS
+  httpOnly: true,
+  sameSite: 'none',
+  maxAge: 24 * 60 * 60 * 1000
+}
 
 // Middlewares - ИСПРАВЛЕННЫЙ CORS
 app.use(cors({
