@@ -14,7 +14,8 @@ const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-
+const cors = require("cors");
+app.use(cors());
 // Middlewares
 app.use(helmet());
 app.use(cors({
