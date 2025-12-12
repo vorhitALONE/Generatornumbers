@@ -1,6 +1,7 @@
 // main.js — логика для index.html
 let activeNumber = null;
 let historyData = [];
+
 import cors from 'cors';
 app.use(cors({
   origin: '*' // временно для теста, лучше указать фронтенд-домен
@@ -18,6 +19,7 @@ async function fetchActiveNumber() {
     document.getElementById('active-number-time').textContent = 'Ошибка загрузки';
   }
 }
+fetch("https://vorhitalone-generatornumbers-46cd.twc1.net/api/generate")
 
 async function generateNumber() {
   const btn = document.getElementById('generate-btn');
