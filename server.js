@@ -63,6 +63,10 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
+const PORT = process.env.PORT || 3000;
+console.log('🚀 Starting server on port:', PORT);
+console.log('📁 Current directory:', __dirname);
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
 
 // Ensure admin
 (async () => {
