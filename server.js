@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const helmet = require('helmet');
 const cors = require('cors');
 const path = require('path');
+const FileStore = require('session-file-store')(session);
 
 const db = require('./db');
 
@@ -48,8 +49,13 @@ app.use(helmet({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Настройка сессий
+// Настройка хранилища сессий в файлах
 app.use(session({
+  store: new FileStore({
+    path: './data/sessions',
+    ttl: 86400,
+    retries: 0
+  }),
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -69,6 +75,8 @@ app.use(session({
       const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
       db.prepare('INSERT INTO admins (username, password_hash) VALUES (?, ?)').run(ADMIN_USERNAME, hash);
       console.log("✅ Admin created successfully");
+    } else {
+      console.log("✅ Admin already exists");
     }
   } catch (e) {
     console.error('❌ Admin init error:', e);
@@ -83,7 +91,9 @@ function getActive() {
 
 function requireAdmin(req, res, next) {
   console.log('🔐 Checking admin session:', req.session);
+  console.log('🍪 Session ID:', req.sessionID);
   console.log('🍪 Cookies:', req.headers.cookie);
+  console.log('🌍 Origin:', req.headers.origin);
   
   if (req.session && req.session.admin) {
     console.log('✅ Admin authenticated:', req.session.admin.username);
@@ -91,6 +101,7 @@ function requireAdmin(req, res, next) {
   }
   
   console.log('❌ Admin not authenticated');
+  console.log('❌ Session data:', JSON.stringify(req.session));
   res.status(401).json({ error: 'Unauthorized - Please login again' });
 }
 
@@ -214,6 +225,7 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
 
 app.get('/api/admin/check', (req, res) => {
   console.log('🔍 Checking session:', req.session);
+  console.log('🔍 Session ID:', req.sessionID);
   
   if (req.session && req.session.admin) {
     res.json({ authenticated: true, username: req.session.admin.username });
