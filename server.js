@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// Простое хранилище токенов в памяти (для production лучше использовать Redis)
+// Простое хранилище токенов в памяти
 const activeSessions = new Map();
 
 console.log('🚀 Starting server on port:', PORT);
@@ -79,7 +79,7 @@ function generateToken() {
 function requireAdmin(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   
-  console.log('🔐 Checking token:', token);
+  console.log('🔐 Checking token:', token?.substring(0, 10) + '...');
   
   if (!token) {
     console.log('❌ No token provided');
@@ -93,7 +93,6 @@ function requireAdmin(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized - Please login again' });
   }
   
-  // Проверяем, не истёк ли токен
   if (Date.now() > session.expiresAt) {
     console.log('❌ Token expired');
     activeSessions.delete(token);
@@ -129,6 +128,25 @@ app.post('/api/generate', (req, res) => {
 
     const now = new Date().toISOString();
     db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(row.value, 'user', now);
+
+    // Проверяем, есть ли следующее число в очереди
+    const nextInQueue = db.prepare('SELECT id, value FROM queue ORDER BY id ASC LIMIT 1').get();
+    
+    if (nextInQueue) {
+      // Удаляем текущее из очереди
+      db.prepare('DELETE FROM queue WHERE id = ?').run(nextInQueue.id);
+      
+      // Проверяем, есть ли ещё числа в очереди
+      const nextValue = db.prepare('SELECT value FROM queue ORDER BY id ASC LIMIT 1').get();
+      
+      if (nextValue) {
+        // Устанавливаем следующее как активное
+        db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(nextValue.value, now);
+      } else {
+        // Очередь закончилась
+        db.prepare('UPDATE config SET active_value = NULL, updated_at = ? WHERE id = 1').run(now);
+      }
+    }
 
     res.json({ value: row.value, generatedAt: now });
   } catch (error) {
@@ -169,9 +187,8 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Генерируем токен
     const token = generateToken();
-    const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 часа
+    const expiresAt = Date.now() + (24 * 60 * 60 * 1000);
     
     activeSessions.set(token, {
       id: admin.id,
@@ -205,28 +222,52 @@ app.post('/api/admin/logout', requireAdmin, (req, res) => {
 
 app.post('/api/admin/active', requireAdmin, (req, res) => {
   try {
-    console.log('📝 Setting active value:', req.body);
+    console.log('📝 Setting active values:', req.body);
     
-    const value = parseInt(req.body.value);
-    if (isNaN(value)) {
-      return res.status(400).json({ error: 'Некорректное число' });
+    const { values } = req.body;
+    
+    if (!values || !Array.isArray(values) || values.length === 0) {
+      return res.status(400).json({ error: 'Необходимо передать массив чисел' });
+    }
+
+    // Проверяем, что все значения - числа
+    const validValues = values.filter(v => !isNaN(parseInt(v))).map(v => parseInt(v));
+    
+    if (validValues.length === 0) {
+      return res.status(400).json({ error: 'Не найдено корректных чисел' });
     }
 
     const now = new Date().toISOString();
     
+    // Очищаем старую очередь
+    db.prepare('DELETE FROM queue').run();
+    
+    // Добавляем все числа в очередь (таблица queue)
+    const insertQueue = db.prepare('INSERT INTO queue (value, added_at) VALUES (?, ?)');
+    
+    for (const value of validValues) {
+      insertQueue.run(value, now);
+      // Записываем в историю
+      db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(value, 'admin', now);
+    }
+
+    // Устанавливаем первое значение как активное
     const exists = db.prepare('SELECT id FROM config WHERE id = 1').get();
     if (!exists) {
-      db.prepare('INSERT INTO config (id, active_value, updated_at) VALUES (1, ?, ?)').run(value, now);
+      db.prepare('INSERT INTO config (id, active_value, updated_at) VALUES (1, ?, ?)').run(validValues[0], now);
     } else {
-      db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(value, now);
+      db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(validValues[0], now);
     }
-    
-    db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(value, 'admin', now);
 
-    console.log('✅ Active value set to:', value);
-    res.json({ ok: true, value, updatedAt: now });
+    console.log(`✅ Added ${validValues.length} values to queue`);
+    res.json({ 
+      ok: true, 
+      count: validValues.length,
+      nextValue: validValues[0],
+      values: validValues
+    });
   } catch (error) {
-    console.error('Error setting active value:', error);
+    console.error('Error setting active values:', error);
     res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
   }
 });
