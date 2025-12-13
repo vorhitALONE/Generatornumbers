@@ -12,7 +12,7 @@ const db = new Database(DB_PATH);
 const initSql = fs.readFileSync(path.join(__dirname, 'migrations', 'init.sql'), 'utf8');
 db.exec(initSql);
 
-// Создаём таблицу config если её нет
+// Создаём таблицу config и queue если их нет
 db.exec(`
   CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY,
@@ -20,7 +20,15 @@ db.exec(`
     updated_at TEXT
   );
   
+  CREATE TABLE IF NOT EXISTS queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    value INTEGER NOT NULL,
+    added_at TEXT NOT NULL
+  );
+  
   INSERT OR IGNORE INTO config (id, active_value) VALUES (1, NULL);
 `);
+
+console.log('✅ Database initialized');
 
 module.exports = db;
