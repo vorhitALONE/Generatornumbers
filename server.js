@@ -1,20 +1,21 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const helmet = require('helmet');
 const cors = require('cors');
 const path = require('path');
-const FileStore = require('session-file-store')(session);
+const crypto = require('crypto');
 
 const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret_key_123';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+// Простое хранилище токенов в памяти (для production лучше использовать Redis)
+const activeSessions = new Map();
 
 console.log('🚀 Starting server on port:', PORT);
 console.log('📁 Current directory:', __dirname);
@@ -38,7 +39,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Set-Cookie']
+  exposedHeaders: ['Authorization']
 }));
 
 app.use(helmet({
@@ -48,24 +49,6 @@ app.use(helmet({
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-// Настройка хранилища сессий в файлах
-app.use(session({
-  store: new FileStore({
-    path: './data/sessions',
-    ttl: 86400,
-    retries: 0
-  }),
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: true,      // true для HTTPS на production
-    httpOnly: true,
-    sameSite: 'none',  // Для кросс-доменных запросов
-    maxAge: 24 * 60 * 60 * 1000
-  }
-}));
 
 // Ensure admin
 (async () => {
@@ -89,20 +72,37 @@ function getActive() {
   return row || { value: null, updated_at: null };
 }
 
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 function requireAdmin(req, res, next) {
-  console.log('🔐 Checking admin session:', req.session);
-  console.log('🍪 Session ID:', req.sessionID);
-  console.log('🍪 Cookies:', req.headers.cookie);
-  console.log('🌍 Origin:', req.headers.origin);
+  const token = req.headers.authorization?.replace('Bearer ', '');
   
-  if (req.session && req.session.admin) {
-    console.log('✅ Admin authenticated:', req.session.admin.username);
-    return next();
+  console.log('🔐 Checking token:', token);
+  
+  if (!token) {
+    console.log('❌ No token provided');
+    return res.status(401).json({ error: 'Unauthorized - Please login again' });
   }
   
-  console.log('❌ Admin not authenticated');
-  console.log('❌ Session data:', JSON.stringify(req.session));
-  res.status(401).json({ error: 'Unauthorized - Please login again' });
+  const session = activeSessions.get(token);
+  
+  if (!session) {
+    console.log('❌ Invalid or expired token');
+    return res.status(401).json({ error: 'Unauthorized - Please login again' });
+  }
+  
+  // Проверяем, не истёк ли токен
+  if (Date.now() > session.expiresAt) {
+    console.log('❌ Token expired');
+    activeSessions.delete(token);
+    return res.status(401).json({ error: 'Session expired - Please login again' });
+  }
+  
+  console.log('✅ Admin authenticated:', session.username);
+  req.admin = session;
+  next();
 }
 
 // API ROUTES
@@ -169,17 +169,23 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    req.session.admin = { id: admin.id, username: admin.username };
+    // Генерируем токен
+    const token = generateToken();
+    const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 часа
     
-    req.session.save((err) => {
-      if (err) {
-        console.error('❌ Session save error:', err);
-        return res.status(500).json({ error: 'Login failed' });
-      }
-      
-      console.log('✅ Admin logged in:', admin.username);
-      console.log('📋 Session ID:', req.sessionID);
-      res.json({ ok: true, username: admin.username });
+    activeSessions.set(token, {
+      id: admin.id,
+      username: admin.username,
+      expiresAt
+    });
+    
+    console.log('✅ Admin logged in:', admin.username);
+    console.log('📋 Token generated:', token.substring(0, 10) + '...');
+    
+    res.json({ 
+      ok: true, 
+      username: admin.username,
+      token: token
     });
     
   } catch (error) {
@@ -188,11 +194,13 @@ app.post('/api/admin/login', async (req, res) => {
   }
 });
 
-app.post('/api/admin/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ error: 'Logout failed' });
-    res.json({ ok: true });
-  });
+app.post('/api/admin/logout', requireAdmin, (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    activeSessions.delete(token);
+    console.log('✅ Admin logged out');
+  }
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/active', requireAdmin, (req, res) => {
@@ -224,12 +232,20 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
 });
 
 app.get('/api/admin/check', (req, res) => {
-  console.log('🔍 Checking session:', req.session);
-  console.log('🔍 Session ID:', req.sessionID);
+  const token = req.headers.authorization?.replace('Bearer ', '');
   
-  if (req.session && req.session.admin) {
-    res.json({ authenticated: true, username: req.session.admin.username });
+  console.log('🔍 Checking token:', token?.substring(0, 10) + '...');
+  
+  if (!token) {
+    return res.json({ authenticated: false });
+  }
+  
+  const session = activeSessions.get(token);
+  
+  if (session && Date.now() < session.expiresAt) {
+    res.json({ authenticated: true, username: session.username });
   } else {
+    if (session) activeSessions.delete(token);
     res.json({ authenticated: false });
   }
 });
