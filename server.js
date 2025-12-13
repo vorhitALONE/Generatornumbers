@@ -14,17 +14,14 @@ const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret_key_123';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-cookie: { 
-  secure: true,  // ВАЖНО: true для production на HTTPS
-  httpOnly: true,
-  sameSite: 'none',
-  maxAge: 24 * 60 * 60 * 1000
-}
 
-// Middlewares - ИСПРАВЛЕННЫЙ CORS
+console.log('🚀 Starting server on port:', PORT);
+console.log('📁 Current directory:', __dirname);
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+
+// Middlewares - CORS
 app.use(cors({
   origin: function(origin, callback) {
-    // Разрешаем все домены для разработки
     const allowedOrigins = [
       'https://vorhitalone-generator--a39d.twc1.net',
       'http://localhost:3000',
@@ -34,7 +31,7 @@ app.use(cors({
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(null, true); // Временно разрешаем все
+      callback(null, true);
     }
   },
   credentials: true,
@@ -51,22 +48,18 @@ app.use(helmet({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ИСПРАВЛЕННАЯ СЕССИЯ - без secure cookie для отладки
+// Настройка сессий
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: false,  // ИЗМЕНЕНО: false для работы через http/https
+    secure: true,      // true для HTTPS на production
     httpOnly: true,
-    sameSite: 'none',  // ДОБАВЛЕНО: для кросс-доменных запросов
+    sameSite: 'none',  // Для кросс-доменных запросов
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
-const PORT = process.env.PORT || 3000;
-console.log('🚀 Starting server on port:', PORT);
-console.log('📁 Current directory:', __dirname);
-console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
 
 // Ensure admin
 (async () => {
@@ -89,7 +82,8 @@ function getActive() {
 }
 
 function requireAdmin(req, res, next) {
-  console.log('🔐 Checking admin session:', req.session); // ДОБАВЛЕНО: логирование
+  console.log('🔐 Checking admin session:', req.session);
+  console.log('🍪 Cookies:', req.headers.cookie);
   
   if (req.session && req.session.admin) {
     console.log('✅ Admin authenticated:', req.session.admin.username);
@@ -146,7 +140,7 @@ app.post('/api/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    console.log('🔑 Login attempt for:', username); // ДОБАВЛЕНО
+    console.log('🔑 Login attempt for:', username);
     
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
@@ -166,7 +160,6 @@ app.post('/api/admin/login', async (req, res) => {
 
     req.session.admin = { id: admin.id, username: admin.username };
     
-    // ДОБАВЛЕНО: Сохраняем сессию явно
     req.session.save((err) => {
       if (err) {
         console.error('❌ Session save error:', err);
@@ -174,7 +167,7 @@ app.post('/api/admin/login', async (req, res) => {
       }
       
       console.log('✅ Admin logged in:', admin.username);
-      console.log('Session ID:', req.sessionID);
+      console.log('📋 Session ID:', req.sessionID);
       res.json({ ok: true, username: admin.username });
     });
     
@@ -202,7 +195,6 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
 
     const now = new Date().toISOString();
     
-    // Проверяем существование записи
     const exists = db.prepare('SELECT id FROM config WHERE id = 1').get();
     if (!exists) {
       db.prepare('INSERT INTO config (id, active_value, updated_at) VALUES (1, ?, ?)').run(value, now);
@@ -220,21 +212,8 @@ app.post('/api/admin/active', requireAdmin, (req, res) => {
   }
 });
 
-
-    const now = new Date().toISOString();
-    db.prepare('UPDATE config SET active_value = ?, updated_at = ? WHERE id = 1').run(value, now);
-    db.prepare('INSERT INTO history (value, actor, timestamp) VALUES (?, ?, ?)').run(value, 'admin', now);
-
-    console.log('✅ Active value set to:', value);
-    res.json({ ok: true, value, updatedAt: now });
-  } catch (error) {
-    console.error('Error setting active value:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
-  }
-});
-
 app.get('/api/admin/check', (req, res) => {
-  console.log('🔍 Checking session:', req.session); // ДОБАВЛЕНО
+  console.log('🔍 Checking session:', req.session);
   
   if (req.session && req.session.admin) {
     res.json({ authenticated: true, username: req.session.admin.username });
